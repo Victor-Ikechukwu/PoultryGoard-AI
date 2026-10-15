@@ -1,0 +1,4 @@
+{"ts": 1792051335.0119064, "type": "notification", "channel": "app", "case_id": 1, "to": "On-call Vet", "message": "[PoultryGuard] Suspected mortality — Case #1, Farm-A/House-1, Zone A2, age 18d, detected 13:32:13. Please review the attached case file."}
+{"ts": 1792063732.1189125, "type": "notification", "channel": "app", "case_id": 2, "to": "On-call Vet", "message": "[PoultryGuard] Suspected mortality — Case #2, Farm-A/House-1, Zone A2, age 18d, detected 16:57:51. Please review the attached case file."}
+{"ts": 1792065536.967161, "type": "booking", "case_id": 2, "to": "On-call Vet", "slot": "2026-10-15 19:28"}
+{"ts": 1792084964.5769136, "type": "notification", "channel": "app", "case_id": 2, "to": "On-call Vet", "message": "[PoultryGuard] Suspected mortality — Case #2, Farm-A/House-1, Zone A3, age 18d, detected 22:52:43. Please review the attached case file."}

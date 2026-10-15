@@ -1,0 +1,47 @@
+name: Export chicken.onnx
+
+# Re-export the ONNX model whenever the trained PyTorch weights change, so the
+# deployed Streamlit Cloud app (which runs on chicken.onnx) stays current.
+on:
+  push:
+    paths:
+      - "models/chicken.pt"
+  workflow_dispatch: {}          # allow manual runs from the Actions tab
+
+permissions:
+  contents: write                # needed to commit the refreshed model back
+
+concurrency:                     # don't run two exports at once
+  group: export-onnx
+  cancel-in-progress: true
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install export deps
+        run: pip install --quiet ultralytics onnx
+
+      - name: Export chicken.pt -> chicken.onnx
+        run: python tools/export_onnx.py
+
+      - name: Commit refreshed model (only if it changed)
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- models/chicken.onnx; then
+            echo "chicken.onnx unchanged — nothing to commit."
+          else
+            git add models/chicken.onnx
+            git commit -m "chore: re-export chicken.onnx from updated chicken.pt [skip ci]"
+            git push
+          fi

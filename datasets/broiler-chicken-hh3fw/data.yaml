@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['chicken']
+
+roboflow:
+  workspace: gel
+  project: broiler-chicken-hh3fw
+  version: 9
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/gel/broiler-chicken-hh3fw/dataset/9

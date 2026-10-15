@@ -1,0 +1,8 @@
+# PoultryGuard — Streamlit Cloud runtime (lightweight, CPU-only, no PyTorch/ultralytics)
+# Inference runs on ONNX Runtime using models/chicken.onnx.
+streamlit>=1.37
+onnxruntime>=1.17
+supervision>=0.25,<0.31          # ByteTrack tracker (removed in 0.31)
+opencv-python-headless>=4.9      # no GUI libs -> lighter, fewer apt deps
+numpy>=1.26,<2.3
+pandas>=2.0

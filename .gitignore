@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.log
+
+# Large / regenerable artifacts — DO NOT commit (keep the repo small for Streamlit Cloud)
+datasets/                 # training data (hundreds of MB) — pulled via tools/train_chicken.py
+models/train/             # training runs, checkpoints, plots
+runs/
+logs/
+*.db                      # runtime SQLite (ephemeral)
+cases/                    # auto-saved evidence snapshots (runtime)
+mortality_posture_dataset/
+data/uploaded_video.mp4   # user uploads
+
+# KEEP (needed for a cloud deploy): these are intentionally NOT ignored
+#   models/chicken.onnx   (10 MB)  -> runtime detector on cloud
+#   models/chicken.pt     (5 MB)   -> torch backend for local dev
+#   data/demo_flock.mp4   (4 MB)   -> demo source
+#   data/samples/*.jpg             -> demo images

@@ -1,0 +1,6 @@
+train: D:/Reem-Oman's-Project/PoultryGuard_PoC/datasets/broiler-chicken-hh3fw/train/images
+val: D:/Reem-Oman's-Project/PoultryGuard_PoC/datasets/broiler-chicken-hh3fw/valid/images
+test: D:/Reem-Oman's-Project/PoultryGuard_PoC/datasets/broiler-chicken-hh3fw/test/images
+
+nc: 1
+names: ['chicken']
