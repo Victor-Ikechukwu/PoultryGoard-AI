@@ -23,7 +23,7 @@ result = pipeline.process_frame(frame, now=0.0)
 assert result.annotated.shape == frame.shape
 assert result.count >= 0
 pipeline.reset_tracks()
-app = AppTest.from_file("app.py").run(timeout=60)
+app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py")).run(timeout=60)
 assert not app.exception, [x.message for x in app.exception]
 assert len(app.text_input) == 2, "Expected the username and password fields"
 assert "torch" not in sys.modules and "ultralytics" not in sys.modules
