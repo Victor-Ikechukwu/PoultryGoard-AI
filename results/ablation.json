@@ -1,0 +1,51 @@
+{
+  "n_images": 130,
+  "n_dense": 69,
+  "resolution": [
+    {
+      "imgsz": 416,
+      "MAE": 2.17,
+      "MAPE_dense": 4.9,
+      "ms": 163.0
+    },
+    {
+      "imgsz": 512,
+      "MAE": 2.05,
+      "MAPE_dense": 4.7,
+      "ms": 148.0
+    },
+    {
+      "imgsz": 640,
+      "MAE": 2.01,
+      "MAPE_dense": 4.5,
+      "ms": 176.0
+    },
+    {
+      "imgsz": 960,
+      "MAE": 5.3,
+      "MAPE_dense": 12.8,
+      "ms": 494.0
+    }
+  ],
+  "confidence": [
+    {
+      "conf": 0.25,
+      "MAE": 2.05,
+      "MAPE_dense": 4.9
+    },
+    {
+      "conf": 0.4,
+      "MAE": 2.01,
+      "MAPE_dense": 4.5
+    },
+    {
+      "conf": 0.55,
+      "MAE": 2.57,
+      "MAPE_dense": 5.4
+    }
+  ],
+  "latency": {
+    "torch": 210.0,
+    "onnx": 98.0
+  }
+}

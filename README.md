@@ -163,8 +163,14 @@ stack (~1 GB) is **not installed on the cloud** — only `models/chicken.onnx` (
 1. Push the repo to GitHub **including** `models/chicken.onnx` (and `data/demo_flock.mp4`,
    `data/samples/`). The `.gitignore` already drops the large folders.
 2. On <https://share.streamlit.io> → *New app* → pick the repo, branch, and `app.py`.
+   **Set the Python version to 3.12** in *Advanced settings* (the ML wheels have no
+   Python 3.14 build — the repo also pins it via `.python-version`).
 3. Deploy. First build installs the light stack (~1–2 min) and the app comes up on
    the demo video.
+
+> **If you see `ModuleNotFoundError: cv2`** in the Cloud logs, the build picked Python 3.13/3.14.
+> Fix: *Manage app → Settings → Python version → 3.12 → Reboot* (and confirm `.python-version`
+> is committed). opencv/onnxruntime ship wheels only up to Python 3.12–3.13.
 
 **Backend selection** — `poultryguard/detector.py::build_detector()` reads
 `POULTRYGUARD_BACKEND` (`auto` | `onnx` | `torch`). `auto` (default) uses ONNX when
