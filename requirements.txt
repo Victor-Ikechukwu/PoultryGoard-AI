@@ -4,5 +4,6 @@ streamlit>=1.37
 onnxruntime>=1.17
 supervision>=0.25,<0.31          # ByteTrack tracker (removed in 0.31)
 opencv-python-headless>=4.9      # no GUI libs -> lighter, fewer apt deps
-numpy>=1.26,<2.3
+numpy>=1.26,<2.3; python_version < "3.14"
+numpy>=2.3,<3; python_version >= "3.14"
 pandas>=2.0

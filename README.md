@@ -163,14 +163,36 @@ stack (~1 GB) is **not installed on the cloud** — only `models/chicken.onnx` (
 1. Push the repo to GitHub **including** `models/chicken.onnx` (and `data/demo_flock.mp4`,
    `data/samples/`). The `.gitignore` already drops the large folders.
 2. On <https://share.streamlit.io> → *New app* → pick the repo, branch, and `app.py`.
-   **Set the Python version to 3.12** in *Advanced settings* (the ML wheels have no
-   Python 3.14 build — the repo also pins it via `.python-version`).
+   **Select Python 3.12** in *Advanced settings* for consistency with local development.
+   `.python-version` records that local preference, but does not change an existing
+   Community Cloud deployment's interpreter. The runtime requirements also support
+   Python 3.14 using a compatible NumPy version.
 3. Deploy. First build installs the light stack (~1–2 min) and the app comes up on
    the demo video.
 
-> **If you see `ModuleNotFoundError: cv2`** in the Cloud logs, the build picked Python 3.13/3.14.
-> Fix: *Manage app → Settings → Python version → 3.12 → Reboot* (and confirm `.python-version`
-> is committed). opencv/onnxruntime ship wheels only up to Python 3.12–3.13.
+### Troubleshooting missing OpenCV
+
+`import cv2` comes from `opencv-python-headless`, already listed in the root
+`requirements.txt`. A missing module means the active environment lacks that
+package. Read the Python version and the full Python installation log before
+attributing the failure to system libraries.
+
+The previous `numpy<2.3` constraint had no Python 3.14 binary wheels. The
+requirements now preserve that constraint below Python 3.14 and allow
+`numpy>=2.3,<3` on Python 3.14 and later. Current OpenCV and ONNX Runtime releases
+have compatible wheels, so changing this requirements file triggers a dependency
+rebuild without requiring deletion of the deployed app.
+
+If you prefer Python 3.12, Community Cloud requires deleting and redeploying an
+existing app to change its interpreter. First preserve the app's repository,
+branch, entrypoint, custom subdomain and secrets privately. On the new deployment,
+choose Python 3.12 in Advanced settings. A reboot or a commit to
+`.python-version` alone does not change an existing deployment's Python version.
+See [Streamlit's Python-version instructions](https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app/upgrade-python).
+
+The deployment smoke workflow installs binary wheels on Linux for Python 3.12 and
+3.14, checks OpenCV and ByteTrack, runs CPU ONNX inference, and renders the
+Streamlit login page. It deliberately excludes the large training dataset.
 
 **Backend selection** — `poultryguard/detector.py::build_detector()` reads
 `POULTRYGUARD_BACKEND` (`auto` | `onnx` | `torch`). `auto` (default) uses ONNX when
