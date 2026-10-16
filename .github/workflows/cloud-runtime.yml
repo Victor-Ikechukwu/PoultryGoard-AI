@@ -1,0 +1,55 @@
+name: Cloud runtime smoke test
+
+on:
+  push:
+    paths:
+      - "requirements.txt"
+      - "app.py"
+      - "poultryguard/**"
+      - "models/chicken.onnx"
+      - "tools/smoke_deployment.py"
+      - ".github/workflows/cloud-runtime.yml"
+  pull_request:
+    paths:
+      - "requirements.txt"
+      - "app.py"
+      - "poultryguard/**"
+      - "models/chicken.onnx"
+      - "tools/smoke_deployment.py"
+      - ".github/workflows/cloud-runtime.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.14"]
+    env:
+      POULTRYGUARD_BACKEND: onnx
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            app.py
+            requirements.txt
+            poultryguard
+            models/chicken.onnx
+            tools/smoke_deployment.py
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - name: Install cloud runtime from binary wheels
+        run: |
+          python -m pip install --only-binary=:all: -r requirements.txt
+      - name: Check dependency consistency
+        run: python -m pip check
+      - name: Check imports, tracker, inference and Streamlit startup
+        run: python tools/smoke_deployment.py
