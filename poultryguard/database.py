@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS cases (
     score REAL,
     reason TEXT,
     snapshot_path TEXT,
+    clip_path TEXT,          -- short video clip captured around the event
+    report_path TEXT,        -- auto-generated case report saved to disk
     premortality TEXT        -- json timeline
 );
 CREATE TABLE IF NOT EXISTS vet_actions (
@@ -54,7 +56,15 @@ class DB:
         self.conn = sqlite3.connect(self.path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        self._migrate()
         self.conn.commit()
+
+    def _migrate(self):
+        """Add columns to an existing DB created by an older schema."""
+        have = {r[1] for r in self.conn.execute("PRAGMA table_info(cases)")}
+        for col in ("clip_path", "report_path"):
+            if col not in have:
+                self.conn.execute(f"ALTER TABLE cases ADD COLUMN {col} TEXT")
 
     # ---- cases ----
     def add_case(self, **kw) -> int:

@@ -48,3 +48,25 @@ def book_visit(db, case_id: int, slot: str, vet_name: str = "On-call Vet") -> st
     db.add_action(case_id, "booked", detail=f"Farm visit booked for {slot}", vet_name=vet_name)
     db.update_case(case_id, status="visit_booked")
     return f"Visit booked for {slot} with {vet_name}"
+
+
+def review_case(db, case_id: int, vet_name: str = "On-call Vet", note: str = "") -> str:
+    """Step 14 - veterinary case review of the AI-compiled file."""
+    db.add_action(case_id, "review", detail=note or "Vet reviewed the AI case file", vet_name=vet_name)
+    db.update_case(case_id, status="under_review")
+    return "Case marked as reviewed by the veterinarian"
+
+
+def record_examination(db, case_id: int, findings: str, vet_name: str = "On-call Vet") -> str:
+    """Step 16 - on-site veterinary examination."""
+    db.add_action(case_id, "examination", detail=findings, vet_name=vet_name)
+    db.update_case(case_id, status="examined")
+    return "On-site examination recorded"
+
+
+def schedule_follow_up(db, case_id: int, when: str, note: str = "", vet_name: str = "On-call Vet") -> str:
+    """Step 19 - follow-up monitoring after treatment."""
+    _send({"ts": time.time(), "type": "follow_up", "case_id": case_id, "to": vet_name, "when": when})
+    db.add_action(case_id, "follow_up", detail=f"Follow-up on {when}. {note}".strip(), vet_name=vet_name)
+    db.update_case(case_id, status="follow_up")
+    return f"Follow-up monitoring scheduled for {when}"

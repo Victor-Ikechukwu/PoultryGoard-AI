@@ -75,7 +75,8 @@ class Settings:
 DEFAULTS = Settings()
 
 # Veterinary workflow enumerations -------------------------------------------
-CASE_STATUS = ["open", "vet_notified", "visit_booked", "examined", "closed"]
+CASE_STATUS = ["open", "vet_notified", "under_review", "visit_booked",
+               "examined", "follow_up", "closed"]
 
 POSTURE_LABELS = [
     "standing_normal",

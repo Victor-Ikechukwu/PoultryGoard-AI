@@ -11,11 +11,12 @@ Returns an annotated frame plus structured telemetry the Streamlit UI renders.
 from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
+from collections import deque
 from pathlib import Path
 import time
 import numpy as np
 
-from . import config, draw
+from . import config, draw, reporting
 from .detector import Detector, Detection, build_detector
 from .posture import PostureClassifier
 from .behavior import BehaviorTracker, median_neighbour_spacing
@@ -46,6 +47,9 @@ class Pipeline:
         self.mortality = MortalityEngine(self.s)
         self._zone = None
         self._last_t = None
+        # rolling buffer of recent frames (down-scaled) for automatic VIDEO capture
+        self._clip_fps = max(5, int(self.s.fps_assumed))
+        self._frame_buf = deque(maxlen=self._clip_fps * 4)   # ~4 s of footage
         import supervision as sv
         self._sv = sv
         self.tracker = sv.ByteTrack(
@@ -80,6 +84,18 @@ class Pipeline:
         now = now if now is not None else t0
         zone = self._ensure_zone(frame)
         sv = self._sv
+
+        # buffer a down-scaled copy for automatic video capture
+        try:
+            import cv2
+            h0, w0 = frame.shape[:2]
+            if w0 > 640:
+                fb = cv2.resize(frame, (640, int(640 * h0 / w0)))
+            else:
+                fb = frame.copy()
+            self._frame_buf.append(fb)
+        except Exception:
+            pass
 
         dets: list[Detection] = self.detector.detect(frame)
 
@@ -185,6 +201,23 @@ class Pipeline:
         except Exception:
             snap_path = ""
 
+        # --- automatic VIDEO capture: short clip from the rolling buffer ---
+        clip_path = ""
+        try:
+            import cv2
+            if len(self._frame_buf) >= 3:
+                cp = snap_dir / f"case_{ts.strftime('%Y%m%d_%H%M%S')}_bird{chick_ref}.mp4"
+                hh, ww = self._frame_buf[-1].shape[:2]
+                vw = cv2.VideoWriter(str(cp), cv2.VideoWriter_fourcc(*"mp4v"),
+                                     float(self._clip_fps), (ww, hh))
+                for f in list(self._frame_buf):
+                    if f.shape[:2] == (hh, ww):
+                        vw.write(f)
+                vw.release()
+                clip_path = str(cp)
+        except Exception:
+            clip_path = ""
+
         premortality = self.behavior.premortality_timeline(a.track_id, time.time())
         cid = self.db.add_case(
             chick_ref=chick_ref, farm_id=self.s.farm_id, house_id=self.s.house_id,
@@ -192,6 +225,17 @@ class Pipeline:
             detected_time=ts.strftime("%H:%M:%S"), posture=pr.label,
             posture_profile=pr.profile, immobile_s=a.immobile_s, isolation=a.isolation,
             score=a.score, reason=a.reason, snapshot_path=str(snap_path),
-            premortality=premortality,
+            clip_path=clip_path, premortality=premortality,
         )
+        # --- AI health alert + auto-generated case report saved to disk ---
+        self.db.add_action(cid, "alert",
+                           f"AI health alert: suspected mortality (score {a.score}) at Zone {a.zone}, "
+                           f"{ts.strftime('%H:%M:%S')}", vet_name="PoultryGuard AI")
+        try:
+            report_md = reporting.build_case_report(self.db.get_case(cid), self.db.actions_for(cid))
+            rp = snap_dir / f"case_{ts.strftime('%Y%m%d_%H%M%S')}_bird{chick_ref}_report.md"
+            rp.write_text(report_md, encoding="utf-8")
+            self.db.update_case(cid, report_path=str(rp))
+        except Exception:
+            pass
         return cid

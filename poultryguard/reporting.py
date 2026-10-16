@@ -53,8 +53,12 @@ def build_case_report(case: dict, actions: list[dict] | None = None,
         for row in pm[:12]:
             lines.append(f"| {row.get('t_minus_s')} | {row.get('speed_px_s')} |")
         lines.append("")
-    if case.get("snapshot_path"):
-        lines.append(f"## Evidence\n- Snapshot: `{case['snapshot_path']}`")
+    if case.get("snapshot_path") or case.get("clip_path"):
+        lines.append("## Evidence")
+        if case.get("snapshot_path"):
+            lines.append(f"- Snapshot image: `{case['snapshot_path']}`")
+        if case.get("clip_path"):
+            lines.append(f"- Video clip: `{case['clip_path']}`")
         lines.append("")
     if actions:
         lines.append("## Veterinary actions")

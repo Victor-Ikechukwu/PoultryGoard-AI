@@ -10,7 +10,7 @@ Run:  streamlit run app.py
 from __future__ import annotations
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import cv2
@@ -248,6 +248,8 @@ def render_cases():
     with left:
         if case.get("snapshot_path") and Path(case["snapshot_path"]).exists():
             st.image(case["snapshot_path"], caption=f"{t('evidence')} — {t('bird')} {case['chick_ref']}, {t('zone')} {case['zone']}")
+        if case.get("clip_path") and Path(case["clip_path"]).exists():
+            st.video(case["clip_path"]); st.caption(t("evidence_clip"))
         st.markdown(ui.chip(f"{t('suspected_at')} · {t('zone')} {case['zone']} · {case['detected_time']}", "bad"),
                     unsafe_allow_html=True)
     with right:
@@ -270,20 +272,46 @@ def render_vet():
     case = db.get_case(cid)
     st.markdown(f"**{t('case')} #{cid}** · {case['house_id']} · {t('zone')} {case['zone']} · "
                 f"{t('age')} {case['age_days']} · {t('status')} **{case['status']}**")
+    # evidence: auto-captured snapshot + video clip
+    if (case.get("snapshot_path") and Path(case["snapshot_path"]).exists()) or \
+       (case.get("clip_path") and Path(case["clip_path"]).exists()):
+        ev1, ev2 = st.columns(2)
+        if case.get("snapshot_path") and Path(case["snapshot_path"]).exists():
+            ev1.image(case["snapshot_path"], caption=t("evidence"))
+        if case.get("clip_path") and Path(case["clip_path"]).exists():
+            ev2.video(case["clip_path"]); ev2.caption(t("evidence_clip"))
     vet_name = st.text_input(t("veterinarian"), user["name"] if role == "vet" else "Dr. Vet")
+
+    # Step 14 — veterinary case review, and Step 16 — on-site examination
+    r1, r2 = st.columns([1, 2])
+    if r1.button("🔍 " + t("review_case"), use_container_width=True):
+        st.success(vet.review_case(db, cid, vet_name)); st.rerun()
+    exam = r2.text_input(t("exam_findings"), label_visibility="collapsed", placeholder=t("exam_findings"))
+    if r1.button("🩺 " + t("record_examination"), use_container_width=True) and exam:
+        st.success(vet.record_examination(db, cid, exam, vet_name)); st.rerun()
+
+    # Steps 17–18 — diagnosis / treatment / vaccination
     d1, d2, d3 = st.columns(3)
     diagnosis = d1.text_input(t("diagnosis"))
     treatment = d2.text_input(t("treatment"))
     vaccination = d3.text_input(t("vaccination"))
-    b1, b2, b3, b4 = st.columns(4)
+    b1, b2, b3 = st.columns(3)
     if b1.button(t("log_diagnosis"), use_container_width=True) and diagnosis:
         db.add_action(cid, "diagnosis", diagnosis, vet_name); db.update_case(cid, status="examined"); st.rerun()
     if b2.button(t("log_treatment"), use_container_width=True) and treatment:
         db.add_action(cid, "treatment", treatment, vet_name); st.rerun()
     if b3.button(t("log_vaccination"), use_container_width=True) and vaccination:
         db.add_action(cid, "vaccination", vaccination, vet_name); st.rerun()
-    if b4.button("✅ " + t("close_case"), use_container_width=True):
-        db.add_action(cid, "closed", "Case closed after vet action", vet_name)
+
+    # Step 19 — follow-up monitoring, Step 20 — closure
+    f1, f2, f3 = st.columns([1.2, 1.2, 1])
+    fu_when = f1.text_input(t("follow_up_when"),
+                            (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d %H:%M"))
+    fu_note = f2.text_input(t("follow_up_notes"))
+    if f3.button("🔁 " + t("schedule_follow_up"), use_container_width=True):
+        st.success(vet.schedule_follow_up(db, cid, fu_when, fu_note, vet_name)); st.rerun()
+    if st.button("✅ " + t("close_case"), use_container_width=True):
+        db.add_action(cid, "closed", "Case closed and database updated", vet_name)
         db.update_case(cid, status="closed"); st.rerun()
     acts = db.actions_for(cid)
     if acts:
@@ -369,24 +397,36 @@ def render_dataset():
 def render_req():
     st.subheader(t("req_title"))
     with st.container(border=True):
-        st.markdown(f"**{t('pipeline')}**")
-        st.markdown("`Camera → Detection → Tracking → Behaviour/Immobility → Posture → "
-                    "Suspected mortality → Localisation → Auto-documentation → Case registration "
-                    "→ Vet notification → Visit booking → Exam/Diagnosis/Treatment → Closure`")
+        st.markdown(f"**{t('pipeline')}** — full 20-step workflow")
+        st.markdown("`Camera → Detection → Tracking → Behaviour → Abnormal → Suspected mortality "
+                    "→ Posture → Location → Image/Video capture → DB registration → AI alert "
+                    "→ Case report → Vet notification → Case review → Visit → Examination "
+                    "→ Diagnosis → Treatment/Vaccination → Follow-up → Closure`")
+    L, C, V, E, D = t("nav_live"), t("nav_cases"), t("nav_vet"), t("nav_env"), t("nav_dataset")
     cov = [
-        ("1. Live chick counting", "detector.py + pipeline", t("nav_live")),
-        ("2. Mortality detection (immobility + posture)", "mortality.py / behavior.py", t("nav_live")),
-        ("3. Location identification (zone)", "zones.py", t("nav_cases")),
-        ("4. Automatic documentation (snapshot + DB)", "pipeline / database.py", t("nav_cases")),
-        ("5. Body-shape / posture analysis", "posture.py", t("nav_cases")),
-        ("6. Vet case file + remote booking", "reporting.py / vet.py", t("nav_cases")),
-        ("7. Vet action logging", "database.vet_actions", t("nav_vet")),
-        ("Pre-mortality behaviour look-back", "behavior.premortality_timeline", t("nav_cases")),
-        ("Environmental early-warning", "sensors.py", t("nav_env")),
-        ("Mortality Posture Dataset build", "Dataset tab", t("nav_dataset")),
+        ("1 · Camera feed (webcam / RTSP / upload)", "app.py sources", L),
+        ("2 · Chick detection", "detector.py / detector_onnx.py", L),
+        ("3 · Individual / group tracking", "pipeline.py (ByteTrack)", L),
+        ("4 · Movement & behaviour analysis", "behavior.py", L),
+        ("5 · Abnormal behaviour detection", "mortality.py (ABNORMAL)", L),
+        ("6 · Suspected mortality detection", "mortality.py (SUSPECTED)", L),
+        ("7 · Posture classification", "posture.py", C),
+        ("8 · Location identification (zone)", "zones.py", C),
+        ("9 · Automatic image/video capture", "pipeline._open_case (snapshot + clip)", C),
+        ("10 · Case registration in database", "database.add_case", C),
+        ("11 · AI health alert", "pipeline alert + live banner", L),
+        ("12 · Automatic case report", "reporting.py (saved to disk)", C),
+        ("13 · Veterinarian notification / call", "vet.notify_vet", C),
+        ("14 · Veterinary case review", "vet.review_case", V),
+        ("15 · Farm visit appointment", "vet.book_visit", C),
+        ("16 · On-site veterinary examination", "vet.record_examination", V),
+        ("17 · Diagnosis", "Vet Console", V),
+        ("18 · Treatment / vaccination / medication", "Vet Console", V),
+        ("19 · Follow-up monitoring", "vet.schedule_follow_up", V),
+        ("20 · Case closure & database update", "Vet Console", V),
     ]
     st.dataframe(pd.DataFrame(cov, columns=[t("requirement"), t("implemented_in"), t("see_tab")]),
-                 use_container_width=True, height=390, hide_index=True)
+                 use_container_width=True, height=560, hide_index=True)
     st.markdown(f"### {t('detector')}")
     chick = config.CHICKEN_WEIGHTS; valp = config.ROOT / "results" / "VALIDATION.md"
     st.markdown(ui.chip(t("model_active") if chick.exists() else t("model_fallback"),
