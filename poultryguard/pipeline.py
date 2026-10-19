@@ -12,7 +12,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from collections import deque
-from pathlib import Path
 import time
 import numpy as np
 
@@ -46,7 +45,6 @@ class Pipeline:
         self.behavior = BehaviorTracker(self.s)
         self.mortality = MortalityEngine(self.s)
         self._zone = None
-        self._last_t = None
         # rolling buffer of recent frames (down-scaled) for automatic VIDEO capture
         self._clip_fps = max(5, int(self.s.fps_assumed))
         self._frame_buf = deque(maxlen=self._clip_fps * 4)   # ~4 s of footage

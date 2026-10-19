@@ -19,3 +19,6 @@ data/uploaded_video.mp4   # user uploads
 #   models/chicken.pt     (5 MB)   -> torch backend for local dev
 #   data/demo_flock.mp4   (4 MB)   -> demo source
 #   data/samples/*.jpg             -> demo images
+
+# auto-downloaded model checkpoints at repo root (SAM, yolo)
+/*.pt

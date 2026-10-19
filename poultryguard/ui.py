@@ -40,6 +40,11 @@ h1,h2,h3,h4{font-family:'Sora','Inter',sans-serif; letter-spacing:-.01em; color:
 [data-testid="stSidebar"]{background:linear-gradient(180deg,#0f2e20 0%, #123a28 100%); border-right:1px solid #0b241a;}
 [data-testid="stSidebar"] *{color:#e8f2ec !important;}
 [data-testid="stSidebar"] label{color:#bcd6c8 !important; font-weight:500;}
+/* inputs in the (dark) sidebar keep a light field + dark text so values are readable */
+[data-testid="stSidebar"] input, [data-testid="stSidebar"] textarea,
+[data-testid="stSidebar"] [data-baseweb="input"] input,
+[data-testid="stSidebar"] [data-baseweb="select"] div[role="button"]{color:#15241c !important;}
+[data-testid="stSidebar"] input::placeholder{color:#6b7a72 !important;}
 [data-testid="stSidebar"] [data-testid="stExpander"]{border:1px solid rgba(255,255,255,.08);
   border-radius:12px; background:rgba(255,255,255,.03);}
 [data-testid="stSidebar"] hr{border-color:rgba(255,255,255,.12);}

@@ -8,7 +8,7 @@ posture.  A detector that directly emits a 'dead' class short-circuits to
 suspected immediately.
 """
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 from . import config

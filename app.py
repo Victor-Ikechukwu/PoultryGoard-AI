@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from poultryguard import config, vet, reporting, ui, i18n, auth
+from poultryguard import config, vet, reporting, ui, i18n, auth, camera
 from poultryguard.database import DB
 from poultryguard.pipeline import Pipeline
 from poultryguard.sensors import EnvironmentSensors, target_temp_band
@@ -96,14 +96,27 @@ pipe = get_pipeline()
 sensors = ss("sensors", EnvironmentSensors(config.DEFAULTS))
 
 
+def release_camera():
+    """Close and forget the active camera so the device is freed (webcam light off)."""
+    cap = st.session_state.get("cap")
+    if cap is not None:
+        try:
+            cap.release()
+        except Exception:
+            pass
+    st.session_state.cap = None
+    st.session_state.cap_sig = None
+
+
 # --------------------------------------------------------------------- sidebar
 with st.sidebar:
     st.markdown(f"### 🐔 {t('app_title')}")
     st.caption(f"{t('signed_in_as')}: {user['name']} · {t(auth.ROLE_LABEL_KEY[role])}")
     language_theme_controls(st)
     if st.button("⇦ " + t("logout"), use_container_width=True):
-        st.session_state.user = None
         st.session_state.running = False
+        release_camera()
+        st.session_state.user = None
         st.rerun()
     st.divider()
 
@@ -130,9 +143,11 @@ with st.sidebar:
         t("demo_video"), t("upload_video"), t("upload_images"), t("webcam"), t("ip_camera")])
     SRC = {t("demo_video"): "demo", t("upload_video"): "upvid", t("upload_images"): "upimg",
            t("webcam"): "webcam", t("ip_camera"): "rtsp"}[source]
-    rtsp_url = ""; up_video = up_images = None
+    rtsp_url = ""; up_video = up_images = None; webcam_index = 0
     if SRC == "rtsp":
         rtsp_url = st.text_input(t("stream_url"), "rtsp://user:pass@192.168.1.50:554/stream1")
+    elif SRC == "webcam":
+        webcam_index = st.number_input(t("webcam_index"), min_value=0, max_value=8, value=0, step=1)
     elif SRC == "upvid":
         up_video = st.file_uploader(t("upload_video"), ["mp4", "avi", "mov", "mkv"])
     elif SRC == "upimg":
@@ -144,8 +159,26 @@ with st.sidebar:
         st.session_state.running = True
     if cc2.button("■ " + t("stop"), use_container_width=True):
         st.session_state.running = False
+        release_camera()                      # free the camera immediately on Stop
     if st.button("🧪 " + t("inject_demo"), use_container_width=True, help=t("inject_help")):
         pipe.request_demo_event(); st.session_state.running = True
+
+    # camera-state indicator (inline !important beats the sidebar's light-text rule)
+    if st.session_state.running and SRC in ("webcam", "rtsp"):
+        _dot, _col, _lbl = "●", "#ff5a5f", t("cam_live")        # red: device in use
+    elif st.session_state.running:
+        _dot, _col, _lbl = "▶", "#39c483", t("cam_running")      # green: running, no camera
+    else:
+        _dot, _col, _lbl = "○", "#9db3a8", t("cam_off")          # grey: off
+    st.markdown(
+        f"<div style='margin-top:6px'><span style='color:{_col} !important;font-weight:700'>{_dot}</span>"
+        f"<span style='color:#cfe3d8 !important'> {_lbl}</span></div>",
+        unsafe_allow_html=True)
+
+# Safety net: never hold a camera open while monitoring is stopped. This runs on
+# every rerun, so the device is released as soon as the session is not running.
+if not st.session_state.running:
+    release_camera()
 
 ui.header("fine-tuned chicken" if pipe.detector.is_finetuned else "generic fallback",
           pipe.s.farm_id, pipe.s.house_id, pipe.s.flock_age_days, t)
@@ -153,35 +186,32 @@ ui.header("fine-tuned chicken" if pipe.detector.is_finetuned else "generic fallb
 
 # --------------------------------------------------------------------- helpers
 def _source_sig():
-    return f"{SRC}|{rtsp_url}|{getattr(up_video,'name','') if up_video else ''}"
+    return f"{SRC}|{rtsp_url}|{webcam_index}|{getattr(up_video,'name','') if up_video else ''}"
 
 def open_capture():
+    """Build a CameraSource for the selected input, or None if not configured."""
     if SRC == "demo":
-        return cv2.VideoCapture(str(DEMO_VIDEO)) if DEMO_VIDEO.exists() else None
+        return camera.make_source("file", file_path=DEMO_VIDEO, loop=True)
     if SRC == "webcam":
-        return cv2.VideoCapture(0)
-    if SRC == "rtsp" and rtsp_url:
-        return cv2.VideoCapture(rtsp_url)
+        return camera.make_source("webcam", webcam_index=int(webcam_index))
+    if SRC == "rtsp":
+        return camera.make_source("stream", stream_url=rtsp_url)
     if SRC == "upvid" and up_video is not None:
         tmp = config.DATA_DIR / "uploaded_video.mp4"
         tmp.write_bytes(up_video.read())
-        return cv2.VideoCapture(str(tmp))
+        return camera.make_source("file", file_path=tmp, loop=True)
     return None
 
 def get_frame():
     sig = _source_sig()
     cap = st.session_state.cap
-    if cap is None or not cap.isOpened() or st.session_state.cap_sig != sig:
+    if cap is None or st.session_state.cap_sig != sig:
         if cap is not None:
             cap.release()
         cap = open_capture()
-        st.session_state.cap = cap; st.session_state.cap_sig = sig
-    if cap is None:
-        return None
-    ok, frame = cap.read()
-    if not ok:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, 0); ok, frame = cap.read()
-    return frame if ok else None
+        st.session_state.cap = cap
+        st.session_state.cap_sig = sig
+    return cap.read() if cap is not None else None
 
 
 # --------------------------------------------------------------------- tab renderers
@@ -203,8 +233,17 @@ def render_live():
         if st.session_state.running:
             frame = get_frame()
             if frame is None:
-                st.session_state.running = False
-                st.warning(t("no_frame")); st.rerun(); return
+                # tolerate transient drops (webcam warm-up / stream reconnect);
+                # give up only after a sustained outage (~2 s of empty ticks).
+                st.session_state.cam_misses = st.session_state.get("cam_misses", 0) + 1
+                if st.session_state.cam_misses > 25:
+                    st.session_state.running = False
+                    st.session_state.cam_misses = 0
+                    st.warning(t("no_frame"))
+                else:
+                    st.caption("⏳ " + t("cam_connecting"))
+                return
+            st.session_state.cam_misses = 0
             res = pipe.process_frame(frame, now=time.time())
             st.session_state.last_result = res
             st.session_state.counts_history.append(
@@ -402,7 +441,7 @@ def render_req():
                     "→ Posture → Location → Image/Video capture → DB registration → AI alert "
                     "→ Case report → Vet notification → Case review → Visit → Examination "
                     "→ Diagnosis → Treatment/Vaccination → Follow-up → Closure`")
-    L, C, V, E, D = t("nav_live"), t("nav_cases"), t("nav_vet"), t("nav_env"), t("nav_dataset")
+    L, C, V = t("nav_live"), t("nav_cases"), t("nav_vet")
     cov = [
         ("1 · Camera feed (webcam / RTSP / upload)", "app.py sources", L),
         ("2 · Chick detection", "detector.py / detector_onnx.py", L),
